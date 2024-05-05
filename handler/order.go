@@ -21,7 +21,7 @@ func OrderHandler(c *gin.Context) {
 	concurrentLimit := make(chan bool, 10000) // 限制并发数为10000
 	var data orderRequest
 	if err := c.ShouldBindJSON(&data); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, utils.ErrorResponse("Incomplete request parameters", err.Error(), 400))
 		return
 	}
 	userId := data.UserId
@@ -50,20 +50,16 @@ func OrderHandler(c *gin.Context) {
 		stock, err := cmd.Result()
 
 		if err != nil {
-			resultChan <- gin.H{"error": err.Error()}
+			resultChan <- utils.ErrorResponse("Script execution error", err.Error(), 500)
 			return
 		}
 		if stock, ok := stock.(int64); ok {
 			if stock == -1 {
-				resultChan <- gin.H{
-					"message": "Not enough stock",
-				}
+				resultChan <- utils.Response("out of stock", gin.H{}, 200)
 				return
 			}
 		} else {
-			resultChan <- gin.H{
-				"error": "Unexpected result type from Lua script",
-			}
+			resultChan <- utils.ErrorResponse("Unexpected result type from Lua script", "Unexpected result type from Lua script", 501)
 			return
 		}
 
@@ -88,7 +84,7 @@ func OrderHandler(c *gin.Context) {
 		}
 		body, err := json.Marshal(order)
 		if err != nil {
-			resultChan <- gin.H{"error": err.Error()}
+			resultChan <- utils.ErrorResponse("MQ error", err.Error(), 502)
 			return
 		}
 		err = db.Ch.Publish(
@@ -101,28 +97,22 @@ func OrderHandler(c *gin.Context) {
 				Body:        body,
 			})
 		if err != nil {
-			resultChan <- gin.H{"error": err.Error()}
+			resultChan <- utils.ErrorResponse("MQ error", err.Error(), 503)
 			return
 		}
 
-		resultChan <- gin.H{
+		resultChan <- utils.Response("send MQ successfully", gin.H{
 			"userId":        userId,
-			"orderTime":     orderTime,
 			"orderQuantity": orderQuantity,
 			"stock":         stock,
-		}
+		}, 201)
 	}()
 
 	result := <-resultChan
-	err, ok := result["error"]
+	_, ok := result["error"]
 
 	if ok {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err})
-		return
-	}
-	msg, ok := result["message"]
-	if ok {
-		c.JSON(http.StatusOK, gin.H{"msg": msg})
+		c.JSON(http.StatusInternalServerError, result)
 		return
 	} else {
 		c.JSON(http.StatusOK, result)
