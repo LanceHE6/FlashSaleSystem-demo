@@ -2,9 +2,10 @@ package config
 
 import (
 	"fmt"
-	"gopkg.in/yaml.v3"
 	"io/ioutil"
 	"os"
+
+	"gopkg.in/yaml.v3"
 )
 
 // 定义数据结构
@@ -35,6 +36,7 @@ type Config struct {
 		PORT     string `yaml:"port"`
 		ACCOUNT  string `yaml:"account"`
 		PASSWORD string `yaml:"password"`
+		VHOST    string `yaml:"vhost"`
 	} `yaml:"rabbitmq"`
 }
 
@@ -86,11 +88,13 @@ func init() {
 				PORT     string `yaml:"port"`
 				ACCOUNT  string `yaml:"account"`
 				PASSWORD string `yaml:"password"`
+				VHOST    string `yaml:"vhost"`
 			}{
 				HOST:     "localhost",
 				PORT:     "5672",
 				ACCOUNT:  "hycer",
 				PASSWORD: "123456",
+				VHOST:    "my_vhost",
 			},
 		}
 
