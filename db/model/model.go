@@ -1,14 +1,22 @@
 package model
 
+import "time"
+
+type MyModel struct {
+	CreatedAt time.Time `gorm:"autoCreateTime:milli"`
+	UpdatedAt time.Time `gorm:"autoUpdateTime:milli"`
+}
+
 type Order struct {
-	OrderId       string `gorm:"primaryKey;index;unique"`
+	MyModel
+	OrderId       string `gorm:"primary_key;index"`
 	UserId        string
-	OrderTime     string
 	OrderQuantity int
 }
 
 type Goods struct {
-	Gid      string `gorm:"primaryKey;index;unique"`
+	MyModel
+	Gid      string `gorm:"primary_key;index"`
 	Name     string
 	Quantity int
 }
