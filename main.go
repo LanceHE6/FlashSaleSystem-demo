@@ -3,7 +3,9 @@ package main
 import (
 	"flashSaleSystem/config"
 	"flashSaleSystem/handler"
+	"flashSaleSystem/handler/goods"
 	"flashSaleSystem/worker"
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -17,8 +19,23 @@ func main() {
 		gin.SetMode(gin.ReleaseMode)
 	}
 
-	r.POST("/seckill", func(c *gin.Context) {
-		handler.OrderHandler(c)
+	api := r.Group("/api")
+
+	// 秒杀接口
+	api.POST("/seckill", func(ctx *gin.Context) {
+		handler.OrderHandler(ctx)
+	})
+
+	// 货品相关接口
+	goodsApi := api.Group("/goods")
+	goodsApi.POST("/add", func(ctx *gin.Context) {
+		goods.AddGoods(ctx)
+	})
+	goodsApi.GET("/list", func(ctx *gin.Context) {
+		goods.ListGoods(ctx)
+	})
+	goodsApi.PUT("/update", func(ctx *gin.Context) {
+		goods.UpdateGoods(ctx)
 	})
 
 	err := r.Run()
