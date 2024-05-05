@@ -5,7 +5,7 @@ mysql:
     host: "localhost"
     port: "3306"
     account: "root"
-    password: "root"
+    password: "123456"
     dbname: "flash_sale"
 redis:
     host: "localhost"
@@ -15,5 +15,6 @@ redis:
 rabbitmq:
     host: "localhost"
     port: "5672"
-    account: "hycer"
-    password: "123456"
+    account: "admin"
+    password: "admin"
+    vhost: "my_vhost"
