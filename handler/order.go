@@ -2,11 +2,12 @@ package handler
 
 import (
 	"encoding/json"
-	"flashSaleSystem/db"
+	"flashSaleSystem/db/initDB"
 	"flashSaleSystem/utils"
+	"net/http"
+
 	"github.com/gin-gonic/gin"
 	"github.com/streadway/amqp"
-	"net/http"
 )
 
 type orderRequest struct {
@@ -26,7 +27,6 @@ func OrderHandler(c *gin.Context) {
 	}
 	userId := data.UserId
 	Gid := data.GoodsId
-	orderTime := data.OrderTime
 	orderQuantity := data.OrderQuantity
 	// 创建一个Channel用于接收处理结果
 	resultChan := make(chan gin.H)
@@ -46,7 +46,7 @@ func OrderHandler(c *gin.Context) {
 				  return -1
 				end
 				`
-		cmd := db.Rdb.Eval(luaScript, []string{Gid}, orderQuantity)
+		cmd := initDB.Rdb.Eval(luaScript, []string{Gid}, orderQuantity)
 		stock, err := cmd.Result()
 
 		if err != nil {
@@ -64,22 +64,11 @@ func OrderHandler(c *gin.Context) {
 		}
 
 		orderId := utils.GenerateUuid(8) // 生成一个唯一的订单ID
-		//// 在Redis中存储用户的订单信息
-		//err = db.Rdb.HMSet(orderId, map[string]interface{}{
-		//	"userId":        userId,
-		//	"orderTime":     orderTime,
-		//	"orderQuantity": orderQuantity,
-		//}).Err()
-		//if err != nil {
-		//	resultChan <- gin.H{"error": err.Error()}
-		//	return
-		//}
 
 		// 将订单信息发送到RabbitMQ队列
 		order := map[string]interface{}{
 			"orderId":       orderId,
 			"userId":        userId,
-			"orderTime":     orderTime,
 			"orderQuantity": orderQuantity,
 		}
 		body, err := json.Marshal(order)
@@ -87,7 +76,7 @@ func OrderHandler(c *gin.Context) {
 			resultChan <- utils.ErrorResponse("MQ error", err.Error(), 502)
 			return
 		}
-		err = db.Ch.Publish(
+		err = initDB.Ch.Publish(
 			"",            // exchange
 			"order_queue", // routing key
 			false,         // mandatory
