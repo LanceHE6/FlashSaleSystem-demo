@@ -2,7 +2,7 @@ package worker
 
 import (
 	"encoding/json"
-	"flashSaleSystem/db"
+	"flashSaleSystem/db/initDB"
 	"flashSaleSystem/db/model"
 	"fmt"
 	"log"
@@ -16,9 +16,10 @@ func failOnError(err error, msg string) {
 	}
 }
 
+// SyncOrderWordker 利用MQ将订单信息同步进mysql
 func SyncOrderWorker() {
 
-	q, err := db.Ch.QueueDeclare(
+	q, err := initDB.Ch.QueueDeclare(
 		"order_queue", // name
 		true,          // durable
 		false,         // delete when unused
@@ -28,7 +29,7 @@ func SyncOrderWorker() {
 	)
 	failOnError(err, "Failed to declare a queue")
 
-	msgs, err := db.Ch.Consume(
+	msgs, err := initDB.Ch.Consume(
 		q.Name, // queue
 		"",     // consumer
 		true,   // auto-ack
@@ -48,7 +49,7 @@ func SyncOrderWorker() {
 		}
 
 		// 将订单信息写入到 MySQL 数据库
-		db.Mdb.Create(&order)
+		initDB.Mdb.Create(&order)
 	}
 }
 
@@ -69,26 +70,32 @@ func SyncGoods() {
 	}
 }
 
+// syncGoodsToMySQL 将redis中的货品数量同步进mysql中
 func syncGoodsToMySQL() error {
 	// 获取 Redis 中所有的商品库存
-	keys, err := db.Rdb.Keys("g*").Result()
+	keys, err := initDB.Rdb.Keys("g*").Result()
 	if err != nil {
 		return err
 	}
-
+	fmt.Println("sync goods to mysql")
 	// 逐个更新 MySQL 中的商品库存
 	for _, key := range keys {
-		stock, err := db.Rdb.Get(key).Int()
+		stock, err := initDB.Rdb.Get(key).Int()
 		if err != nil {
 			return err
 		}
+		good := model.Goods{
+			Gid:      key,
+			Quantity: stock,
+		}
 
-		var good model.Goods
-		good.Quantity = stock
-		db.Mdb.Model(&model.Goods{}).Where("gid=?", key).Updates(&good)
-		good.Quantity = stock
-		fmt.Println("sync goods to mysql")
+		result := initDB.Mdb.Model(&model.Goods{}).Where("gid=?", good.Gid).Update("quantity", stock)
+		if result.Error != nil {
+			fmt.Println("sync goods error: " + result.Error.Error())
+		}
+
 	}
+	fmt.Println("sync competely")
 
 	return nil
 }
