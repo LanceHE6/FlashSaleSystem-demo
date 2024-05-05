@@ -1,14 +1,15 @@
-package db
+package initDB
 
 import (
 	"flashSaleSystem/config"
 	"flashSaleSystem/db/model"
 	"fmt"
+	"os"
+
 	"github.com/go-redis/redis"
 	"github.com/jinzhu/gorm"
 	_ "github.com/jinzhu/gorm/dialects/mysql"
 	"github.com/streadway/amqp"
-	"os"
 )
 
 var (
@@ -25,17 +26,18 @@ func init() {
 	// 初始化RabbitMQ连接
 	Ch, _ = initRabbitMQ()
 
-	syncGoodsToRedis() // 将mysql中的库存数据同步进redis中
+	SyncGoodsToRedis() // 将mysql中的库存数据同步进redis中
 }
 
 func initDB() (*gorm.DB, error) {
-	// 连接MySQL数据库
-	db, err := gorm.Open("mysql", fmt.Sprintf("%s:%s@tcp(%s:%s)/?charset=utf8&parseTime=True&loc=Local",
+	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/?charset=utf8&parseTime=True&loc=Local",
 		config.ServerConfig.MYSQL.ACCOUNT,
 		config.ServerConfig.MYSQL.PASSWORD,
 		config.ServerConfig.MYSQL.HOST,
 		config.ServerConfig.MYSQL.PORT,
-	))
+	)
+	// 连接MySQL数据库
+	db, err := gorm.Open("mysql", dsn)
 	if err != nil {
 		fmt.Println("connect mysql failed, err:", err)
 		os.Exit(-2)
@@ -48,20 +50,22 @@ func initDB() (*gorm.DB, error) {
 		fmt.Println("can not close the database")
 		os.Exit(-3)
 	}
-	// 连接到指定数据库
-	db, err = gorm.Open("mysql", fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8&parseTime=True&loc=Local",
+	dsn = fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8&parseTime=True&loc=Local",
 		config.ServerConfig.MYSQL.ACCOUNT,
 		config.ServerConfig.MYSQL.PASSWORD,
 		config.ServerConfig.MYSQL.HOST,
 		config.ServerConfig.MYSQL.PORT,
 		config.ServerConfig.MYSQL.DBNAME,
-	))
+	)
+	// 连接到指定数据库
+	db, err = gorm.Open("mysql", dsn)
 	if err != nil {
 		fmt.Println("connect mysql failed, err:", err)
 		os.Exit(-4)
 	}
 	fmt.Println("connect mysql successfully")
 
+	// 自动迁移模板，创建数据表
 	db.AutoMigrate(model.Order{})
 	db.AutoMigrate(model.Goods{})
 	return db, nil
@@ -88,21 +92,22 @@ func initRedis() (*redis.Client, error) {
 
 func initRabbitMQ() (*amqp.Channel, error) {
 	// 连接到 RabbitMQ 服务器
-	conn, err := amqp.Dial(fmt.Sprintf("amqp://%s:%s@%s:%s/",
+	conn, err := amqp.Dial(fmt.Sprintf("amqp://%s:%s@%s:%s/%s",
 		config.ServerConfig.RABBITMQ.ACCOUNT,
 		config.ServerConfig.RABBITMQ.PASSWORD,
 		config.ServerConfig.RABBITMQ.HOST,
 		config.ServerConfig.RABBITMQ.PORT,
+		config.ServerConfig.RABBITMQ.VHOST,
 	))
 	if err != nil {
-		fmt.Println("can not connect RabbitMQ")
+		fmt.Println("can not connect RabbitMQ: " + err.Error())
 		os.Exit(-30)
 	}
 	fmt.Println("connect RabbitMQ successfully")
 
 	ch, err := conn.Channel()
 	if err != nil {
-		_ = fmt.Errorf("can not connect RabbitMQ chanel")
+		_ = fmt.Errorf("can not connect RabbitMQ chanel: " + err.Error())
 		os.Exit(-5)
 	}
 
@@ -115,20 +120,22 @@ func initRabbitMQ() (*amqp.Channel, error) {
 		nil,           // arguments
 	)
 	if err != nil {
-		fmt.Println("can not connect RabbitMQ chanel")
+		fmt.Println("can not connect RabbitMQ chanel: " + err.Error())
 		os.Exit(-6)
 	}
 
 	return ch, nil
 }
 
-func syncGoodsToRedis() {
+func SyncGoodsToRedis() {
 	var goodsRow []model.Goods
 	err := Mdb.Model(model.Goods{}).Select("*").Find(&goodsRow).Error
 	if err != nil {
 		fmt.Println("con not sync goods from mysql to redis")
 		os.Exit(-5)
 	}
+	// 写入数据前清空数据
+	Rdb.FlushDB()
 	// 将数据写入到 Redis
 	for _, good := range goodsRow {
 		err = Rdb.Set(good.Gid, good.Quantity, 0).Err()
