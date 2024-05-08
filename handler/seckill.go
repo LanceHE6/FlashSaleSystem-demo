@@ -28,6 +28,7 @@ func OrderHandler(c *gin.Context) {
 	userId := data.UserId
 	Gid := data.GoodsId
 	orderQuantity := data.OrderQuantity
+	orderTime := data.OrderTime
 	// 创建一个Channel用于接收处理结果
 	resultChan := make(chan gin.H)
 
@@ -70,6 +71,7 @@ func OrderHandler(c *gin.Context) {
 			"orderId":       orderId,
 			"userId":        userId,
 			"orderQuantity": orderQuantity,
+			"orderTime":     orderTime,
 		}
 		body, err := json.Marshal(order)
 		if err != nil {
@@ -104,6 +106,7 @@ func OrderHandler(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, result)
 		return
 	} else {
+		utils.PublishStock()
 		c.JSON(http.StatusOK, result)
 	}
 
