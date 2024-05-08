@@ -42,5 +42,6 @@ func UpdateGoods(context *gin.Context) {
 	}
 	// 同步变化进redis
 	initDB.SyncGoodsToRedis()
+	utils.PublishStock()
 	context.JSON(http.StatusOK, utils.Response("update goods successfuly", gin.H{}, 200))
 }
