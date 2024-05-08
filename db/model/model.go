@@ -12,6 +12,7 @@ type Order struct {
 	OrderId       string `gorm:"primary_key;index"`
 	UserId        string
 	OrderQuantity int
+	OrderTime     string
 }
 
 type Goods struct {
