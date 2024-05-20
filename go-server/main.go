@@ -64,6 +64,9 @@ func main() {
 	goodsApi.PUT("/update", func(ctx *gin.Context) {
 		goods.UpdateGoods(ctx)
 	})
+	goodsApi.POST("/del", func(ctx *gin.Context) {
+		goods.DeleteGoods(ctx)
+	})
 
 	err := r.Run()
 	if err != nil {

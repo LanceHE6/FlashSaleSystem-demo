@@ -10,7 +10,7 @@ import (
 )
 
 type updateGoodsRequest struct {
-	Gid      string `json:"gid" binding:"required"`
+	Gid      string `json:"goods_id" binding:"required"`
 	Name     string `json:"name"`
 	Quantity int    `json:"quantity"`
 }
